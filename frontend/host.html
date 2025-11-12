@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Seminar Quiz — Host</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <h1>Seminar Quiz — Host Panel</h1>
+    <div>
+      <label>Select Question:</label>
+      <select id="question-select"></select>
+      <button id="start-q">Start Question</button>
+    </div>
+    <h2>Live Leaderboard</h2>
+    <ol id="leaderboard"></ol>
+
+    <div style="margin-top:20px;">
+      <button id="download-raw">Download Raw CSV</button>
+      <button id="download-summary">Download Summary CSV</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

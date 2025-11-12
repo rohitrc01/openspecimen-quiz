@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "question": "What is the main goal of this seminar?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct": 0
+  },
+  {
+    "id": 2,
+    "question": "Which tool is used for X in our workflow?",
+    "options": ["Tool A", "Tool B", "Tool C", "Tool D"],
+    "correct": 1
+  },
+  {
+    "id": 3,
+    "question": "Which protocol improves performance for Y?",
+    "options": ["Protocol A", "Protocol B", "Protocol C", "Protocol D"],
+    "correct": 2
+  },
+  {
+    "id": 4,
+    "question": "True or False: Example statement to check knowledge.",
+    "options": ["True", "False"],
+    "correct": 0
+  },
+  {
+    "id": 5,
+    "question": "Which is a best practice?",
+    "options": ["Practice A", "Practice B", "Practice C", "Practice D"],
+    "correct": 3
+  }
+]
