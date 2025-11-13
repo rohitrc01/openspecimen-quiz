@@ -1,32 +1,86 @@
 [
   {
     "id": 1,
-    "question": "What is the main goal of this seminar?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct": 0
+    "question": "Based on the image below, which event shows a missed collection status?",
+    "options": [
+      "A) T0D: Initial Screening (07_1)",
+      "B) T1M: Post-Assesment",
+      "C) T1W: Mid-Treatment Follow-up",
+      "D) T0D: Initial Screening (07_2)"
+    ],
+    "answer_index": 1
   },
   {
     "id": 2,
-    "question": "Which tool is used for X in our workflow?",
-    "options": ["Tool A", "Tool B", "Tool C", "Tool D"],
-    "correct": 1
+    "question": "Given this Freezer Hierarchy:\n\nF\n  R 1\n    D 1\n      B 1\n      B 2\n    D 2\n      B 1\n      B 2\n\nIf we start storing samples in D1.B2 instead of D1.B1, once D1.B2 is full, where will the next sample be auto-allocated?",
+    "options": [
+      "A) Drawer 1 - Box 1",
+      "B) Drawer 2 - Box 2"
+    ],
+    "answer_index": 1
   },
   {
     "id": 3,
-    "question": "Which protocol improves performance for Y?",
-    "options": ["Protocol A", "Protocol B", "Protocol C", "Protocol D"],
-    "correct": 2
+    "question": "If an individual wants to organize a specimen requirement in a specific way, which field enables this arrangement?",
+    "options": [
+      "Sort order",
+      "System settings",
+      "Dsfs",
+      "Fafa"
+    ],
+    "answer_index": 0
   },
   {
     "id": 4,
-    "question": "True or False: Example statement to check knowledge.",
-    "options": ["True", "False"],
-    "correct": 0
+    "question": "Scenario: A participant is registered under the CP, and their samples are stored at Site 1. However, the user cannot view the participant or their samples despite having access. Why?\n\nNote: User has access to Site 1.\nStorage Site Access is Enabled\nMRN site of the participant is Site 2\nBoth option A and B\nNone of the above",
+    "options": [
+      "A) Storage Site Access is Enabled",
+      "B) MRN site of the participant is Site 2",
+      "C) Both option A and B",
+      "D) None of the above"
+    ],
+    "answer_index": 1
   },
   {
     "id": 5,
-    "question": "Which is a best practice?",
-    "options": ["Practice A", "Practice B", "Practice C", "Practice D"],
-    "correct": 3
+    "question": "Which of the following information IS NOT displayed while deleting a CP?",
+    "options": [
+      "Collection protocol registration",
+      "Specimen Count",
+      "Storage Container",
+      "Specify the reason (Comment Box)"
+    ],
+    "answer_index": 1
+  },
+  {
+    "id": 6,
+    "question": "If we enable the Storage Site-Based Access, what restriction does it put on a user?",
+    "options": [
+      "User cannot see the list of specimens stored at another site.",
+      "User cannot see the participants whose MRN site is different.",
+      "User cannot add or edit specimen events for samples stored at another site.",
+      "Option a and c"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": 7,
+    "question": "When a CP is Closed, which of the following cannot be done?",
+    "options": [
+      "Collect the Specimen",
+      "Add the Event",
+      "Close the Event",
+      "Reopen the CP"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": 8,
+    "question": "Can we keep the same SR Code across the event in the same Collection Protocol?",
+    "options": [
+      "True",
+      "False"
+    ],
+    "answer_index": 1
   }
 ]
