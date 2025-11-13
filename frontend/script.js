@@ -3,7 +3,7 @@ const BACKEND_URL = "https://openspecimen-quiz.onrender.com"; // your Render bac
 let ws;
 function connectWS() {
   try {
-    ws = new WebSocket(BACKEND_URL.replace(/^http/, "ws") + "/ws");
+    ws = new WebSocket(BACKEND_URL.replace("https://", "wss://"));
     ws.onopen = () => console.log("WebSocket connected");
     ws.onmessage = (evt) => {
       const data = JSON.parse(evt.data);
