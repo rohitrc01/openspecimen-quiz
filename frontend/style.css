@@ -1,142 +1,116 @@
-/* === General Page Styling === */
+/* ===== GLOBAL ===== */
 body {
-  font-family: "Poppins", sans-serif;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: #fff;
   margin: 0;
   padding: 0;
-  text-align: center;
-  min-height: 100vh;
+  font-family: "Poppins", sans-serif;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  min-height: 100vh;
 }
 
+/* ===== CONTAINER ===== */
+.card {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  width: 90%;
+  max-width: 600px;
+}
+
+/* ===== TITLES ===== */
 h1 {
-  font-size: 2rem;
+  font-size: 1.8rem;
   margin-bottom: 1rem;
   letter-spacing: 1px;
 }
 
+h2 {
+  font-size: 1.2rem;
+  color: #f1f1f1;
+}
+
+/* ===== BUTTONS ===== */
 button {
-  background: linear-gradient(135deg, #6dd5ed, #2193b0);
+  background: #00b4d8;
   border: none;
-  border-radius: 8px;
   color: white;
-  padding: 10px 20px;
-  margin: 8px;
-  font-size: 1rem;
+  padding: 8px 16px;
+  margin: 5px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  font-weight: 600;
+  transition: 0.3s ease;
+  font-size: 0.9rem;
 }
 
 button:hover {
-  transform: scale(1.05);
-  background: linear-gradient(135deg, #2193b0, #6dd5ed);
+  background: #0096c7;
+  transform: translateY(-2px);
 }
 
-/* === Join / Quiz Layout === */
-#join-screen, #quiz-screen, #host-screen {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 2rem;
-  border-radius: 15px;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-  width: 80%;
-  max-width: 500px;
-  animation: fadeIn 0.8s ease-in-out;
+button:disabled {
+  background: gray;
+  cursor: not-allowed;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* === Input === */
+/* ===== INPUT ===== */
 input[type="text"] {
   padding: 10px;
-  border: none;
   border-radius: 8px;
+  border: none;
   width: 70%;
+  text-align: center;
+  margin-bottom: 10px;
   font-size: 1rem;
+}
+
+/* ===== TIMER ===== */
+#time-left {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  background: #ffffff;
+  color: #1e3c72;
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  min-width: 40px;
   text-align: center;
 }
 
-/* === Question Section === */
-#question-text {
-  font-size: 1.2rem;
-  margin: 1rem 0;
-  color: #ffe;
-}
-
-#options button {
-  display: block;
-  width: 100%;
-  max-width: 400px;
-  margin: 10px auto;
-  padding: 12px;
-  font-weight: 600;
-  background: linear-gradient(135deg, #f7971e, #ffd200);
-  color: #333;
-  border: none;
-  border-radius: 10px;
-  transition: transform 0.2s, background 0.3s;
-}
-
-#options button:hover {
-  background: linear-gradient(135deg, #ffd200, #f7971e);
-  transform: scale(1.03);
-}
-
-/* === Timer Styling === */
-#time-left {
-  font-size: 2rem;
-  font-weight: bold;
-  margin-top: 1rem;
-  background: #fff;
-  color: #1e3c72;
-  display: inline-block;
-  padding: 10px 20px;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(255,255,255,0.3);
-  transition: all 0.3s;
-}
-
 #time-left.red {
-  background: #ff5555;
+  background: #ff4b4b;
   color: white;
-  box-shadow: 0 0 20px #ff5555;
+  box-shadow: 0 0 12px #ff4b4b;
 }
 
-/* === Status / Score === */
+/* ===== STATUS ===== */
 #status {
-  margin-top: 15px;
-  font-size: 1.1rem;
-  color: #ffd700;
-}
-
-#score {
+  font-size: 1rem;
   margin-top: 10px;
-  font-size: 1.2rem;
-  color: #fff;
+  color: #ffea00;
 }
 
-/* === Host Leaderboard === */
-#leaderboard {
-  list-style: none;
-  padding: 0;
-  text-align: left;
+/* ===== SCORE ===== */
+#score-val {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #90ee90;
 }
 
+/* ===== LEADERBOARD ===== */
 #leaderboard li {
-  background: rgba(255,255,255,0.1);
-  margin: 5px 0;
-  padding: 10px 15px;
+  list-style: none;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 6px 10px;
   border-radius: 8px;
-  transition: background 0.3s;
-}
-
-#leaderboard li:hover {
-  background: rgba(255,255,255,0.3);
+  margin: 4px 0;
 }
