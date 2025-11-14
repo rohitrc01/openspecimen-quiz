@@ -1,32 +1,40 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Openspecimen Quiz — Player</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <title>OpenSpecimen Quiz — Player</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 </head>
-<body>
-  <div class="container">
-    <h1>Openspecimen Quiz — Player</h1>
-    <div id="join-screen">
-      <input type="text" id="player-name" placeholder="Enter your name" />
-      <button id="join-btn">Join</button>
-      <p>Share this page with participants.</p>
-    </div>
 
-    <div id="quiz-screen" style="display:none">
-      <div id="question-box">
-        <h2 id="question-text">Waiting for next question...</h2>
-        <div id="options"></div>
-        <div id="timer">Timer: <span id="time-left">-</span>s</div>
-      </div>
-      <div id="status"></div>
-      <div id="your-score">Score: <span id="score-val">0</span></div>
-    </div>
+<body>
+<div class="card">
+
+  <h1>OpenSpecimen Quiz — Player</h1>
+
+  <!-- JOIN SCREEN -->
+  <div id="join-screen">
+    <h2>Enter your name to join</h2>
+    <input type="text" id="player-name" placeholder="Your Name" />
+    <br />
+    <button id="join-btn">Join Quiz</button>
   </div>
 
-  <script src="script.js"></script>
+  <!-- QUIZ SCREEN -->
+  <div id="quiz-screen" style="display:none;">
+    <h2 id="question-text">Waiting for host...</h2>
+
+    <div id="options"></div>
+
+    <h3>⏳ Time Left: <span id="time-left">15</span>s</h3>
+
+    <h3 id="status"></h3>
+
+    <h3>Your Score: <span id="score-val">0</span></h3>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
+
