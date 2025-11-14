@@ -1,21 +1,19 @@
-# ============================================
-#   OPENSPECIMEN QUIZ — FIXED BACKEND MAIN.PY
-#   Supports Render + Vercel + WSS WebSockets
-# ============================================
-
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+# main.py
+# OpenSpecimen Quiz — Final backend with answer feedback + robust CSV export
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import json
 import csv
 from datetime import datetime
+import os
+from typing import Dict, Any
 
 app = FastAPI()
 
-# ============================
-#   CORS + ALLOWED ORIGINS
-# ============================
-# Must include your Vercel frontend
+# ---------------------------
+# CORS / Allowed origins
+# ---------------------------
 origins = [
     "https://openspecimen-quiz.vercel.app",
     "http://localhost:5500",
@@ -30,174 +28,198 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================
-#   LOAD QUESTIONS
-# ============================
-with open("questions.json") as f:
+# ---------------------------
+# Load questions (assumes file is in same folder as main.py)
+# ---------------------------
+QUESTIONS_FILE = "questions.json"
+if not os.path.exists(QUESTIONS_FILE):
+    raise RuntimeError(f"{QUESTIONS_FILE} not found in backend directory.")
+
+with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
     QUESTIONS = json.load(f)
 
-# ============================
-#   GLOBAL STATE
-# ============================
+# ---------------------------
+# Global state
+# ---------------------------
 active_question = None
-connected_clients = set()
-scores = {}          # {player_name: score}
-answers_log = {}     # {player_name: {qid: (attempted, correct, time_taken)}}
+connected_clients = set()  # set[WebSocket]
+scores: Dict[str, int] = {}  # player_name -> score
+# answers_log structure:
+# { player_name: { qid: {"attempted":1, "correct":0/1, "time":float} , ... }, ... }
+answers_log: Dict[str, Dict[int, Dict[str, Any]]] = {}
 
-
-# ============================
-#   WEBSOCKET HANDLER
-# ============================
+# ---------------------------
+# WebSocket endpoint
+# ---------------------------
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-    # Accept connections from Vercel frontend
+    # Accept connection
     await ws.accept()
-
     connected_clients.add(ws)
-    print("WebSocket client connected")
-
     try:
+        # keep connection alive; we don't expect to receive messages from client
         while True:
-            await ws.receive_text()   # we don't use messages from client
+            await ws.receive_text()
     except WebSocketDisconnect:
-        connected_clients.remove(ws)
-        print("WebSocket client disconnected")
-
-
-# ============================
-#   BROADCAST FUNCTION
-# ============================
-async def broadcast(msg):
-    dead_clients = []
-    for ws in connected_clients:
-        try:
-            await ws.send_json(msg)
-        except:
-            dead_clients.append(ws)
-
-    for ws in dead_clients:
+        connected_clients.discard(ws)
+    except Exception:
         connected_clients.discard(ws)
 
+# ---------------------------
+# Broadcast helper
+# ---------------------------
+async def broadcast(payload: dict):
+    dead = []
+    for ws in list(connected_clients):
+        try:
+            await ws.send_json(payload)
+        except Exception:
+            dead.append(ws)
+    for ws in dead:
+        connected_clients.discard(ws)
 
-# ============================
-#   API — GET QUESTIONS
-# ============================
+# ---------------------------
+# API: get questions
+# ---------------------------
 @app.get("/questions")
-async def get_qs():
+async def get_questions():
+    # Return questions as-is
     return QUESTIONS
 
-
-# ============================
-#   HOST STARTS A QUESTION
-# ============================
+# ---------------------------
+# API: host starts question
+# ---------------------------
 @app.post("/host/start_question")
 async def start_question(qid: int):
+    # find question
+    q = next((x for x in QUESTIONS if x["id"] == qid), None)
+    if not q:
+        raise HTTPException(status_code=404, detail="Question not found")
     global active_question
-
-    question = next((q for q in QUESTIONS if q["id"] == qid), None)
-    if not question:
-        return {"error": "Invalid question ID"}
-
-    active_question = question
-
-    # Send question to all players
+    active_question = q
+    # Broadcast to all players
     await broadcast({
         "type": "question_start",
-        "question": question
+        "question": q
     })
-
     return {"status": "ok"}
 
-
-# ============================
-#   PLAYER SUBMITS ANSWER
-# ============================
+# ---------------------------
+# API: player submits answer
+# ---------------------------
 @app.post("/submit_answer")
 async def submit_answer(payload: dict):
-    name = payload["name"]
-    qid = payload["qid"]
-    chosen = payload["chosen_index"]
-    time_taken = float(payload["time_taken"])
+    """
+    payload expected:
+    {
+      "name": "Alice",
+      "qid": 1,
+      "chosen_index": 2,
+      "time_taken": 3.123
+    }
+    """
+    # validate payload
+    try:
+        name = str(payload["name"]).strip()
+        qid = int(payload["qid"])
+        chosen_index = int(payload["chosen_index"])
+        time_taken = float(payload.get("time_taken", 0.0))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
 
+    # find question
     question = next((q for q in QUESTIONS if q["id"] == qid), None)
     if not question:
-        return {"error": "Invalid question"}
+        raise HTTPException(status_code=404, detail="Question not found")
 
-    correct = (chosen == question["answer_index"])
+    correct_index = int(question.get("answer_index", -1))
+    correct_flag = 1 if (chosen_index == correct_index) else 0
+    correct_text = question["options"][correct_index] if 0 <= correct_index < len(question["options"]) else ""
 
-    # Count only score = 1 per correct question
-    if correct:
+    # update scores (1 point per correct)
+    if correct_flag:
         scores[name] = scores.get(name, 0) + 1
     else:
         scores.setdefault(name, 0)
 
-    # Log data
+    # log answers in robust structure
     if name not in answers_log:
         answers_log[name] = {}
+    answers_log[name][qid] = {
+        "attempted": 1,
+        "correct": correct_flag,
+        "time": round(time_taken, 3)
+    }
 
-    answers_log[name][qid] = (
-        1,              # attempted
-        1 if correct else 0,
-        time_taken
-    )
-
-    # Broadcast updated leaderboard
+    # Broadcast leaderboard update
+    lb = sorted(scores.items(), key=lambda x: (-x[1], x[0]))
     await broadcast({
         "type": "leaderboard_update",
-        "leaderboard": sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+        "leaderboard": lb
     })
 
-    return {"status": "ok"}
+    # Broadcast answer result so the player (and optionally host) can display correctness
+    # This message includes player name; frontend will filter by name to show only to intended player.
+    await broadcast({
+        "type": "answer_result",
+        "name": name,
+        "qid": qid,
+        "correct": bool(correct_flag),
+        "correct_index": correct_index,
+        "correct_text": correct_text,
+        "time_taken": round(time_taken, 3),
+        "current_score": scores.get(name, 0)
+    })
 
+    return {"status": "ok", "score": scores.get(name, 0)}
 
-# ============================
-#   GET LEADERBOARD
-# ============================
+# ---------------------------
+# API: get leaderboard
+# ---------------------------
 @app.get("/leaderboard")
 async def get_leaderboard():
     lb = sorted(scores.items(), key=lambda x: (-x[1], x[0]))
     return lb
 
-
-# ============================
-#   EXPORT SUMMARY CSV
-# ============================
+# ---------------------------
+# API: export summary CSV (Render-safe, writes to /tmp)
+# ---------------------------
 @app.get("/export/summary")
 async def export_summary():
-    import os
-    filename = "/tmp/summary_export.csv"  # Writable directory on Render
+    tmpfile = "/tmp/summary_export.csv"
+    header = ["player_name", "total_questions", "attempted", "correct", "total_time"]
+    header += [f"Q{q['id']}" for q in QUESTIONS]
 
-    with open(filename, "w", newline="") as f:
+    with open(tmpfile, "w", newline="") as f:
         writer = csv.writer(f)
-        header = ["player_name", "total_questions", "attempted", "correct", "total_time"]
-        header += [f"Q{q['id']}" for q in QUESTIONS]
         writer.writerow(header)
 
-        for player, qdata in answers_log.items():
+        # iterate players sorted by score (desc)
+        for player, _score in sorted(scores.items(), key=lambda x: (-x[1], x[0])):
+            qdata = answers_log.get(player, {})
             total_q = len(QUESTIONS)
-            att = len(qdata)
-            corr = sum(1 for q in qdata.values() if q[1] == 1)
-            ttime = sum(q[2] for q in qdata.values())
+            attempted = len(qdata)
+            correct_count = sum(1 for v in qdata.values() if v.get("correct", 0) == 1)
+            total_time = sum(v.get("time", 0.0) for v in qdata.values())
 
-            row = [player, total_q, att, corr, round(ttime, 3)]
+            row = [player, total_q, attempted, correct_count, round(total_time, 3)]
 
+            # append per-question cells
             for q in QUESTIONS:
                 qid = q["id"]
                 if qid in qdata:
-                    a, c, t = qdata[qid]
-                    row.append(f"{a}|{c}|{round(t,3)}")
+                    v = qdata[qid]
+                    row.append(f"{v.get('attempted',0)}|{v.get('correct',0)}|{v.get('time',0.0)}")
                 else:
                     row.append("0|0|0")
-
             writer.writerow(row)
 
-    return FileResponse(filename, filename="summary_export.csv")
+    # return file as attachment
+    return FileResponse(tmpfile, filename="summary_export.csv")
 
-
-
-# ============================
-#   ROOT PATH
-# ============================
+# ---------------------------
+# Root
+# ---------------------------
 @app.get("/")
 def root():
-    return {"message": "OpenSpecimen Quiz backend running!"}
+    return {"message": "OpenSpecimen Quiz backend running."}
