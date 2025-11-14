@@ -56,11 +56,20 @@ connectWS();
  UTILITY — API FETCH WITH NO-CACHE
 **********************************************/
 async function apiFetch(path, opts = {}) {
-  const url = BACKEND_URL + path + "?ts=" + Date.now();
+  let url = BACKEND_URL + path;
+
+  // If URL already contains "?" → append using "&"
+  if (url.includes("?")) {
+    url += "&ts=" + Date.now();
+  } else {
+    url += "?ts=" + Date.now();
+  }
+
   const res = await fetch(url, opts);
   if (!res.ok) throw new Error(await res.text());
   return res;
 }
+
 
 /**********************************************
  PLAYER PAGE LOGIC (index.html)
