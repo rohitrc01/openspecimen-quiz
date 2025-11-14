@@ -99,7 +99,7 @@ if (document.getElementById("join-btn")) {
   let playerName = "";
   let currentQuestion = null;
   let localTimer = null;
-  let localTimeLeft = 15;
+  let localTimeLeft = 20;
 
   // JOIN QUIZ
   joinBtn.onclick = () => {
@@ -131,7 +131,7 @@ if (document.getElementById("join-btn")) {
     // Reset timer
     if (localTimer) clearInterval(localTimer);
 
-    localTimeLeft = 15;
+    localTimeLeft = 20;
     timerSpan.innerText = localTimeLeft;
     timerSpan.classList.remove("red");
 
@@ -171,7 +171,7 @@ if (document.getElementById("join-btn")) {
         name: playerName,
         qid: currentQuestion.id,
         chosen_index: chosenIdx,
-        time_taken: 15 - localTimeLeft
+        time_taken: 20 - localTimeLeft
       };
 
       await apiFetch("/submit_answer", {
