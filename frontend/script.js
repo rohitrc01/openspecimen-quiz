@@ -1,40 +1,48 @@
 /**********************************************
- OPEN SPECIMEN QUIZ — FINAL STABLE SCRIPT.JS
+ OPEN SPECIMEN QUIZ — FINAL FIXED SCRIPT.JS
+ Supports Vercel + Render + WSS WebSockets
 **********************************************/
 
-// 🔗 Your backend Render URL
+// BACKEND URL (Render)
 const BACKEND_URL = "https://openspecimen-quiz.onrender.com";
 
-// Secure WebSocket URL for HTTPS → WSS
-function makeWSUrl() {
+// SECURE WebSocket URL — FIXED VERSION (HTTPS → WSS)
+function getWSUrl() {
   return BACKEND_URL.replace("https://", "wss://") + "/ws";
 }
 
-// ======== WEBSOCKET CONNECTION ===========
+/**********************************************
+  WEBSOCKET CONNECTION 
+**********************************************/
 let ws;
+
 function connectWS() {
   try {
-    ws = new WebSocket(makeWSUrl());
+    ws = new WebSocket(getWSUrl());
 
-    ws.onopen = () => console.log("WS CONNECTED ✔");
+    ws.onopen = () => {
+      console.log("WS CONNECTED ✔", getWSUrl());
+    };
 
     ws.onmessage = (evt) => {
       const data = JSON.parse(evt.data);
+
       if (data.type === "question_start") {
         window.onQuestionStart?.(data.question);
       }
+
       if (data.type === "leaderboard_update") {
         window.updateLeaderboardUI?.(data.leaderboard);
       }
     };
 
     ws.onclose = () => {
-      console.log("WS disconnected — retrying…");
+      console.log("WS DISCONNECTED — retrying…");
       setTimeout(connectWS, 1500);
     };
 
     ws.onerror = () => {
-      console.log("WS error — retrying…");
+      console.log("WS ERROR — reconnecting…");
     };
 
   } catch (err) {
@@ -44,9 +52,11 @@ function connectWS() {
 
 connectWS();
 
-// ======== API FETCH ===========
+/**********************************************
+ UTILITY — API FETCH WITH NO-CACHE
+**********************************************/
 async function apiFetch(path, opts = {}) {
-  const url = BACKEND_URL + path + "?ts=" + Date.now(); // anti-cache
+  const url = BACKEND_URL + path + "?ts=" + Date.now();
   const res = await fetch(url, opts);
   if (!res.ok) throw new Error(await res.text());
   return res;
@@ -72,33 +82,34 @@ if (document.getElementById("join-btn")) {
   let localTimer = null;
   let localTimeLeft = 15;
 
-  // Join quiz
+  // JOIN QUIZ
   joinBtn.onclick = () => {
     const name = playerNameInput.value.trim();
-    if (!name) return alert("Please enter your name first!");
+    if (!name) return alert("Enter your name!");
 
     playerName = name;
     joinScreen.style.display = "none";
     quizScreen.style.display = "block";
-    statusDiv.innerText = "Waiting for host to start a question…";
+    statusDiv.innerText = "Waiting for host...";
   };
 
-  // When host starts a question
+  // HOST STARTS QUESTION
   window.onQuestionStart = function (question) {
     currentQuestion = question;
 
     questionText.innerText = question.question;
     optionsDiv.innerHTML = "";
 
+    // render options
     question.options.forEach((opt, idx) => {
       const btn = document.createElement("button");
-      btn.className = "opt-btn";
       btn.innerText = opt;
+      btn.className = "opt-btn";
       btn.onclick = () => submitAnswer(idx);
       optionsDiv.appendChild(btn);
     });
 
-    // Reset and start 15-sec timer
+    // RESET 15-second TIMER
     if (localTimer) clearInterval(localTimer);
 
     localTimeLeft = 15;
@@ -109,11 +120,13 @@ if (document.getElementById("join-btn")) {
       localTimeLeft--;
       timerSpan.innerText = localTimeLeft;
 
-      if (localTimeLeft <= 3) timerSpan.classList.add("red");
+      if (localTimeLeft <= 3) {
+        timerSpan.classList.add("red");
+      }
 
       if (localTimeLeft <= 0) {
         clearInterval(localTimer);
-        disableOptions("⏰ Time up! No answer recorded.");
+        disableOptions("⏰ Time up!");
       }
 
     }, 1000);
@@ -121,24 +134,24 @@ if (document.getElementById("join-btn")) {
     statusDiv.innerText = "Answer now!";
   };
 
-  // Disable answer buttons
+  // DISABLE OPTIONS
   function disableOptions(msg) {
     optionsDiv.querySelectorAll("button").forEach(b => b.disabled = true);
     statusDiv.innerText = msg;
   }
 
-  // Submit answer
-  async function submitAnswer(chosenIndex) {
+  // SUBMIT ANSWER
+  async function submitAnswer(chosenIdx) {
     if (!currentQuestion) return;
 
     clearInterval(localTimer);
-    disableOptions("Submitting…");
+    disableOptions("Submitting...");
 
     try {
       const payload = {
         name: playerName,
         qid: currentQuestion.id,
-        chosen_index: chosenIndex,
+        chosen_index: chosenIdx,
         time_taken: 15 - localTimeLeft
       };
 
@@ -153,11 +166,11 @@ if (document.getElementById("join-btn")) {
 
     } catch (err) {
       console.error(err);
-      statusDiv.innerText = "Error submitting answer!";
+      statusDiv.innerText = "Submission failed!";
     }
   }
 
-  // Fetch latest score
+  // FETCH SCORE
   async function fetchLeaderboard() {
     try {
       const res = await apiFetch("/leaderboard");
@@ -179,7 +192,7 @@ if (document.getElementById("start-q")) {
   const startBtn = document.getElementById("start-q");
   const leaderboardOl = document.getElementById("leaderboard");
 
-  // Load all questions
+  // LOAD QUESTIONS
   (async () => {
     const res = await apiFetch("/questions");
     const qs = await res.json();
@@ -187,27 +200,26 @@ if (document.getElementById("start-q")) {
     qs.forEach(q => {
       const opt = document.createElement("option");
       opt.value = q.id;
-      opt.innerText = `Q${q.id}: ${q.question.substring(0, 60)}...`;
+      opt.innerText = `Q${q.id}: ${q.question.substring(0, 70)}...`;
       qSelect.appendChild(opt);
     });
   })();
 
-  // Start question
+  // START QUESTION
   startBtn.onclick = async () => {
     const qid = qSelect.value;
-    if (!qid) return alert("Please select a question.");
+    if (!qid) return alert("Select a question first.");
 
     startBtn.disabled = true;
 
     await apiFetch(`/host/start_question?qid=${qid}`, { method: "POST" });
 
-    setTimeout(() => (startBtn.disabled = false), 1000);
+    setTimeout(() => startBtn.disabled = false, 1000);
   };
 
-  // Update leaderboard
+  // UPDATE LEADERBOARD
   window.updateLeaderboardUI = function (lb) {
     leaderboardOl.innerHTML = "";
-
     lb.forEach(item => {
       const li = document.createElement("li");
       li.innerText = `${item[0]} — ${item[1]} pts`;
@@ -215,5 +227,3 @@ if (document.getElementById("start-q")) {
     });
   };
 }
-
-
