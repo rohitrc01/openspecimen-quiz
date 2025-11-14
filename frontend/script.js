@@ -1,5 +1,5 @@
 
-const BACKEND_URL = "http://127.0.0.1:10000"; // <-- replace this after deploying backend
+const BACKEND_URL = "https://openspecimen-quiz.onrender.com"; // <-- replace this after deploying backend
 
 // WebSocket connection
 let ws;
