@@ -164,7 +164,8 @@ async def get_leaderboard():
 # ============================
 @app.get("/export/summary")
 async def export_summary():
-    filename = "summary_export.csv"
+    import os
+    filename = "/tmp/summary_export.csv"  # Writable directory on Render
 
     with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
@@ -190,7 +191,8 @@ async def export_summary():
 
             writer.writerow(row)
 
-    return FileResponse(filename, filename)
+    return FileResponse(filename, filename="summary_export.csv")
+
 
 
 # ============================
