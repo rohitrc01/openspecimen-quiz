@@ -1,18 +1,19 @@
 /**********************************************
- OPEN SPECIMEN QUIZ — FINAL FIXED SCRIPT.JS
- Supports Vercel + Render + WSS WebSockets
+ OPEN SPECIMEN QUIZ — FINAL STABLE SCRIPT
+ Supports: Vercel (frontend) + Render (backend)
+ With: WSS Fix + Correct/Incorrect Feedback
 **********************************************/
 
-// BACKEND URL (Render)
+// ---- BACKEND URL ----
 const BACKEND_URL = "https://openspecimen-quiz.onrender.com";
 
-// SECURE WebSocket URL — FIXED VERSION (HTTPS → WSS)
+// ---- FIX: Secure WebSocket URL ----
 function getWSUrl() {
   return BACKEND_URL.replace("https://", "wss://") + "/ws";
 }
 
 /**********************************************
-  WEBSOCKET CONNECTION 
+ WEBSOCKET CONNECT
 **********************************************/
 let ws;
 
@@ -20,45 +21,52 @@ function connectWS() {
   try {
     ws = new WebSocket(getWSUrl());
 
-    ws.onopen = () => {
-      console.log("WS CONNECTED ✔", getWSUrl());
-    };
+    ws.onopen = () => console.log("WS CONNECTED ✔");
 
     ws.onmessage = (evt) => {
       const data = JSON.parse(evt.data);
 
+      // Question start
       if (data.type === "question_start") {
         window.onQuestionStart?.(data.question);
       }
 
+      // Leaderboard update
       if (data.type === "leaderboard_update") {
         window.updateLeaderboardUI?.(data.leaderboard);
+      }
+
+      // NEW: Player answer result (correct/incorrect)
+      if (data.type === "answer_result") {
+        if (typeof window.handleAnswerResult === "function") {
+          window.handleAnswerResult(data);
+        }
       }
     };
 
     ws.onclose = () => {
-      console.log("WS DISCONNECTED — retrying…");
+      console.log("WS DISCONNECTED — retrying...");
       setTimeout(connectWS, 1500);
     };
 
     ws.onerror = () => {
-      console.log("WS ERROR — reconnecting…");
+      console.log("WS ERROR — reconnecting...");
     };
 
   } catch (err) {
-    console.error("WS Error:", err);
+    console.error("WebSocket error:", err);
   }
 }
 
 connectWS();
 
 /**********************************************
- UTILITY — API FETCH WITH NO-CACHE
+ FIXED: API FETCH (no more double “?”)
 **********************************************/
 async function apiFetch(path, opts = {}) {
   let url = BACKEND_URL + path;
 
-  // If URL already contains "?" → append using "&"
+  // If URL already has ?, use &ts=
   if (url.includes("?")) {
     url += "&ts=" + Date.now();
   } else {
@@ -66,10 +74,12 @@ async function apiFetch(path, opts = {}) {
   }
 
   const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(await res.text());
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
   return res;
 }
-
 
 /**********************************************
  PLAYER PAGE LOGIC (index.html)
@@ -102,14 +112,14 @@ if (document.getElementById("join-btn")) {
     statusDiv.innerText = "Waiting for host...";
   };
 
-  // HOST STARTS QUESTION
+  // QUESTION STARTED
   window.onQuestionStart = function (question) {
     currentQuestion = question;
 
     questionText.innerText = question.question;
     optionsDiv.innerHTML = "";
 
-    // render options
+    // Render answer buttons
     question.options.forEach((opt, idx) => {
       const btn = document.createElement("button");
       btn.innerText = opt;
@@ -118,7 +128,7 @@ if (document.getElementById("join-btn")) {
       optionsDiv.appendChild(btn);
     });
 
-    // RESET 15-second TIMER
+    // Reset timer
     if (localTimer) clearInterval(localTimer);
 
     localTimeLeft = 15;
@@ -129,9 +139,7 @@ if (document.getElementById("join-btn")) {
       localTimeLeft--;
       timerSpan.innerText = localTimeLeft;
 
-      if (localTimeLeft <= 3) {
-        timerSpan.classList.add("red");
-      }
+      if (localTimeLeft <= 3) timerSpan.classList.add("red");
 
       if (localTimeLeft <= 0) {
         clearInterval(localTimer);
@@ -149,7 +157,9 @@ if (document.getElementById("join-btn")) {
     statusDiv.innerText = msg;
   }
 
-  // SUBMIT ANSWER
+  /**********************************************
+   SUBMIT ANSWER
+  **********************************************/
   async function submitAnswer(chosenIdx) {
     if (!currentQuestion) return;
 
@@ -170,8 +180,7 @@ if (document.getElementById("join-btn")) {
         body: JSON.stringify(payload)
       });
 
-      statusDiv.innerText = "✅ Answer submitted!";
-      fetchLeaderboard();
+      // Actual feedback will arrive via WebSocket (answer_result)
 
     } catch (err) {
       console.error(err);
@@ -179,17 +188,29 @@ if (document.getElementById("join-btn")) {
     }
   }
 
-  // FETCH SCORE
-  async function fetchLeaderboard() {
-    try {
-      const res = await apiFetch("/leaderboard");
-      const data = await res.json();
-      const me = data.find(x => x[0] === playerName);
-      if (me) scoreVal.innerText = me[1];
-    } catch (err) {
-      console.error("Leaderboard error:", err);
+  /**********************************************
+   NEW: HANDLE CORRECT / INCORRECT FEEDBACK
+  **********************************************/
+  window.handleAnswerResult = function (data) {
+    // Only show to the correct player
+    if (data.name !== playerName) return;
+
+    const correct = data.correct;
+    const correctIndex = data.correct_index;
+    const correctText = data.correct_text;
+
+    if (correct) {
+      statusDiv.innerText = `✅ Correct! (+1)`;
+    } else {
+      statusDiv.innerText = `❌ Incorrect — Correct answer (Q${data.qid}):  
+Index: ${correctIndex}  
+Ans: ${correctText}`;
     }
-  }
+
+    // Update live score
+    scoreVal.innerText = data.current_score;
+  };
+
 }
 
 /**********************************************
@@ -209,7 +230,7 @@ if (document.getElementById("start-q")) {
     qs.forEach(q => {
       const opt = document.createElement("option");
       opt.value = q.id;
-      opt.innerText = `Q${q.id}: ${q.question.substring(0, 70)}...`;
+      opt.innerText = `Q${q.id}: ${q.question.substring(0, 60)}...`;
       qSelect.appendChild(opt);
     });
   })();
@@ -221,7 +242,9 @@ if (document.getElementById("start-q")) {
 
     startBtn.disabled = true;
 
-    await apiFetch(`/host/start_question?qid=${qid}`, { method: "POST" });
+    await apiFetch(`/host/start_question?qid=${qid}`, {
+      method: "POST"
+    });
 
     setTimeout(() => startBtn.disabled = false, 1000);
   };
