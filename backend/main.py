@@ -1,219 +1,201 @@
-# server/main.py
+# ============================================
+#   OPENSPECIMEN QUIZ — FIXED BACKEND MAIN.PY
+#   Supports Render + Vercel + WSS WebSockets
+# ============================================
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import json
 import csv
-import os
-import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Dict, List
 from datetime import datetime
 
-APP_DIR = os.path.dirname(__file__)
-QUESTIONS_FILE = os.path.join(APP_DIR, "questions.json")
-RAW_CSV = os.path.join(APP_DIR, "results_raw.csv")
-SUMMARY_CSV = os.path.join(APP_DIR, "results_summary.csv")
+app = FastAPI()
 
-app = FastAPI(title="Seminar Quiz Backend")
+# ============================
+#   CORS + ALLOWED ORIGINS
+# ============================
+# Must include your Vercel frontend
+origins = [
+    "https://openspecimen-quiz.vercel.app",
+    "http://localhost:5500",
+    "*"
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # change to your domain(s) in production
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# In-memory state
-players_scores: Dict[str, int] = {}          # name -> score
-players_details: Dict[str, dict] = {}        # name -> per-question details
-active_question = {"qid": None, "start_time": None}  # current active qid and start time
+# ============================
+#   LOAD QUESTIONS
+# ============================
+with open("questions.json") as f:
+    QUESTIONS = json.load(f)
 
-# Load questions from file
-def load_questions():
-    with open(QUESTIONS_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+# ============================
+#   GLOBAL STATE
+# ============================
+active_question = None
+connected_clients = set()
+scores = {}          # {player_name: score}
+answers_log = {}     # {player_name: {qid: (attempted, correct, time_taken)}}
 
-questions = load_questions()
 
-# Ensure raw CSV exists with header for per-answer logging
-if not os.path.exists(RAW_CSV):
-    with open(RAW_CSV, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            "timestamp", "player_name", "question_id", "chosen_option_index", "is_correct", "time_taken_seconds"
-        ])
-
-# WebSocket manager
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: List[WebSocket] = []
-
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.active_connections.append(ws)
-
-    def disconnect(self, ws: WebSocket):
-        if ws in self.active_connections:
-            self.active_connections.remove(ws)
-
-    async def broadcast(self, message: dict):
-        remove = []
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_json(message)
-            except Exception:
-                remove.append(connection)
-        for c in remove:
-            self.disconnect(c)
-
-manager = ConnectionManager()
-
-# Models
-class SubmitAnswer(BaseModel):
-    name: str
-    qid: int
-    chosen_index: int
-    time_taken: float   # seconds
-
-@app.get("/questions")
-def get_questions():
-    return questions
-
-@app.post("/host/start_question")
-async def start_question(qid: int):
-    """Host triggers a question to start — server broadcasts to all clients"""
-    q = next((x for x in questions if x["id"] == qid), None)
-    if not q:
-        return JSONResponse({"error": "Question not found"}, status_code=404)
-    active_question["qid"] = qid
-    active_question["start_time"] = datetime.utcnow().timestamp()
-    # Broadcast question payload
-    payload = {
-        "type": "question_start",
-        "question": {
-            "id": q["id"],
-            "question": q["question"],
-            "options": q["options"]
-        },
-        "start_time": active_question["start_time"]
-    }
-    await manager.broadcast(payload)
-    return {"status": "started", "qid": qid}
-
-@app.post("/submit_answer")
-async def submit_answer(ans: SubmitAnswer):
-    """Participants submit answers via REST POST (fast)."""
-    # Find question and correctness
-    q = next((x for x in questions if x["id"] == ans.qid), None)
-    if not q:
-        return JSONResponse({"error": "Question not found"}, status_code=404)
-    correct = (ans.chosen_index == q["correct"])
-    # scoring: base + speed bonus (faster -> more points)
-    # If there was a start time from server, we can compute accurate speed bonus using time_taken posted by client.
-    # Score rule: correct -> 1000 - int(time_taken*200) with min 100
-    points = 0
-    if correct:
-        points = max(1000 - int(ans.time_taken * 200), 100)
-    # update in-memory scores and details
-    name = ans.name.strip()
-    if name == "":
-        name = "Anonymous"
-    players_scores[name] = players_scores.get(name, 0) + points
-    # record per-question details
-    if name not in players_details:
-        players_details[name] = {"answers": {}}
-    players_details[name]["answers"][f"Q{ans.qid}"] = {
-        "chosen_index": ans.chosen_index,
-        "is_correct": int(correct),
-        "time_taken": ans.time_taken
-    }
-    # Append raw CSV line
-    with open(RAW_CSV, "a", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            datetime.utcnow().isoformat(),
-            name,
-            ans.qid,
-            ans.chosen_index,
-            int(correct),
-            ans.time_taken
-        ])
-    # Broadcast leaderboard update
-    await manager.broadcast({
-        "type": "leaderboard_update",
-        "leaderboard": sorted(players_scores.items(), key=lambda x: x[1], reverse=True)
-    })
-    return {"status": "recorded", "score_for_player": players_scores[name], "points_added": points}
-
-@app.get("/leaderboard")
-def get_leaderboard():
-    return sorted(players_scores.items(), key=lambda x: x[1], reverse=True)
-
+# ============================
+#   WEBSOCKET HANDLER
+# ============================
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
-    await manager.connect(ws)
+    # Accept connections from Vercel frontend
+    await ws.accept()
+
+    connected_clients.add(ws)
+    print("WebSocket client connected")
+
     try:
-        # send initial state
-        await ws.send_json({
-            "type": "leaderboard_update",
-            "leaderboard": sorted(players_scores.items(), key=lambda x: x[1], reverse=True)
-        })
         while True:
-            # keep alive or accept messages (not required for this flow)
-            data = await ws.receive_text()
-            # echo or ignore
-            # We keep the WS alive; host triggers question via REST
-            await asyncio.sleep(0.01)
+            await ws.receive_text()   # we don't use messages from client
     except WebSocketDisconnect:
-        manager.disconnect(ws)
+        connected_clients.remove(ws)
+        print("WebSocket client disconnected")
 
-@app.get("/export/raw")
-def download_raw_csv():
-    """Download the raw per-answer CSV file."""
-    if os.path.exists(RAW_CSV):
-        return FileResponse(RAW_CSV, media_type="text/csv", filename="results_raw.csv")
-    return JSONResponse({"error": "No raw CSV found yet."}, status_code=404)
 
+# ============================
+#   BROADCAST FUNCTION
+# ============================
+async def broadcast(msg):
+    dead_clients = []
+    for ws in connected_clients:
+        try:
+            await ws.send_json(msg)
+        except:
+            dead_clients.append(ws)
+
+    for ws in dead_clients:
+        connected_clients.discard(ws)
+
+
+# ============================
+#   API — GET QUESTIONS
+# ============================
+@app.get("/questions")
+async def get_qs():
+    return QUESTIONS
+
+
+# ============================
+#   HOST STARTS A QUESTION
+# ============================
+@app.post("/host/start_question")
+async def start_question(qid: int):
+    global active_question
+
+    question = next((q for q in QUESTIONS if q["id"] == qid), None)
+    if not question:
+        return {"error": "Invalid question ID"}
+
+    active_question = question
+
+    # Send question to all players
+    await broadcast({
+        "type": "question_start",
+        "question": question
+    })
+
+    return {"status": "ok"}
+
+
+# ============================
+#   PLAYER SUBMITS ANSWER
+# ============================
+@app.post("/submit_answer")
+async def submit_answer(payload: dict):
+    name = payload["name"]
+    qid = payload["qid"]
+    chosen = payload["chosen_index"]
+    time_taken = float(payload["time_taken"])
+
+    question = next((q for q in QUESTIONS if q["id"] == qid), None)
+    if not question:
+        return {"error": "Invalid question"}
+
+    correct = (chosen == question["answer_index"])
+
+    # Count only score = 1 per correct question
+    if correct:
+        scores[name] = scores.get(name, 0) + 1
+    else:
+        scores.setdefault(name, 0)
+
+    # Log data
+    if name not in answers_log:
+        answers_log[name] = {}
+
+    answers_log[name][qid] = (
+        1,              # attempted
+        1 if correct else 0,
+        time_taken
+    )
+
+    # Broadcast updated leaderboard
+    await broadcast({
+        "type": "leaderboard_update",
+        "leaderboard": sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+    })
+
+    return {"status": "ok"}
+
+
+# ============================
+#   GET LEADERBOARD
+# ============================
+@app.get("/leaderboard")
+async def get_leaderboard():
+    lb = sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+    return lb
+
+
+# ============================
+#   EXPORT SUMMARY CSV
+# ============================
 @app.get("/export/summary")
-def generate_summary():
-    """
-    Generate aggregated CSV per participant with:
-    columns: player_name, total_questions, attempted, correct, total_time, Q1, Q2, ... (each Q cell stores chosen_index|is_correct|time)
-    """
-    # load questions list to know how many Q columns
-    q_ids = [q["id"] for q in questions]
-    header = ["player_name", "total_questions", "attempted", "correct", "total_time"]
-    q_headers = [f"Q{qid}" for qid in q_ids]
-    header.extend(q_headers)
+async def export_summary():
+    filename = "summary_export.csv"
 
-    # build aggregated rows
-    rows = []
-    for player, details in players_details.items():
-        answers = details.get("answers", {})
-        total_questions = len(q_ids)
-        attempted = len(answers)
-        correct = sum(v.get("is_correct", 0) for v in answers.values())
-        total_time = sum(v.get("time_taken", 0.0) for v in answers.values())
-        row = [player, total_questions, attempted, correct, round(total_time, 3)]
-        # fill Q columns with string "chosen|is_correct|time" or empty
-        for qid in q_ids:
-            key = f"Q{qid}"
-            if key in answers:
-                v = answers[key]
-                row.append(f"{v['chosen_index']}|{v['is_correct']}|{round(v['time_taken'],3)}")
-            else:
-                row.append("")
-        rows.append(row)
-
-    # write summary CSV
-    with open(SUMMARY_CSV, "w", newline="", encoding="utf-8") as f:
+    with open(filename, "w", newline="") as f:
         writer = csv.writer(f)
+        header = ["player_name", "total_questions", "attempted", "correct", "total_time"]
+        header += [f"Q{q['id']}" for q in QUESTIONS]
         writer.writerow(header)
-        for r in rows:
-            writer.writerow(r)
 
-    if os.path.exists(SUMMARY_CSV):
-        return FileResponse(SUMMARY_CSV, media_type="text/csv", filename="results_summary.csv")
-    return JSONResponse({"error": "Failed to generate summary"}, status_code=500)
+        for player, qdata in answers_log.items():
+            total_q = len(QUESTIONS)
+            att = len(qdata)
+            corr = sum(1 for q in qdata.values() if q[1] == 1)
+            ttime = sum(q[2] for q in qdata.values())
+
+            row = [player, total_q, att, corr, round(ttime, 3)]
+
+            for q in QUESTIONS:
+                qid = q["id"]
+                if qid in qdata:
+                    a, c, t = qdata[qid]
+                    row.append(f"{a}|{c}|{round(t,3)}")
+                else:
+                    row.append("0|0|0")
+
+            writer.writerow(row)
+
+    return FileResponse(filename, filename)
+
+
+# ============================
+#   ROOT PATH
+# ============================
+@app.get("/")
+def root():
+    return {"message": "OpenSpecimen Quiz backend running!"}
