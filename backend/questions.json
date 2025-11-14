@@ -82,5 +82,27 @@
       "False"
     ],
     "answer_index": 1
+  },
+  {
+    "id": 9,
+    "question": "When a Site is used by two protocols, and both CPs have assigned a different site code, which setting would you use to capture this?",
+    "options": [
+      "SITE CODE",
+      "Show Site Code Information",
+      "External Participant Sites",
+      "Identity Provider"
+    ],
+    "answer_index": 1
+  },
+  {
+    "id": 10,
+    "question": "We missed creating the second of five required SOP Events due to an unintentional human error. What is the correct approach?",
+    "options": [
+      "Create the missing Event and assign the correct timepoint",
+      "Delete the Events below it, then add the new one",
+      "Delete all the Events and recreate them again",
+      "None"
+    ],
+    "answer_index": 0
   }
 ]
