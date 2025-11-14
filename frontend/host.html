@@ -1,29 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Openspecimen Quiz — Host</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <title>OpenSpecimen Quiz — Host</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 </head>
+
 <body>
-  <div class="container">
-    <h1>Openspecimen Quiz — Host Panel</h1>
-    <div>
-      <label>Select Question:</label>
-      <select id="question-select"></select>
-      <button id="start-q">Start Question</button>
-    </div>
-    <h2>Live Leaderboard</h2>
-    <ol id="leaderboard"></ol>
+<div class="card">
 
-    <div style="margin-top:20px;">
-      <button id="download-raw">Download Raw CSV</button>
-      <button id="download-summary">Download Summary CSV</button>
-    </div>
-  </div>
+  <h1>OpenSpecimen Quiz — Host Panel</h1>
+  <h2>Choose a question and broadcast it to all players</h2>
 
-  <script src="script.js"></script>
+  <select id="question-select">
+    <option value="">-- Select Question --</option>
+  </select>
+
+  <br/><br/>
+  <button id="start-q">Start Question</button>
+
+  <h2>📊 Live Leaderboard</h2>
+  <ol id="leaderboard"></ol>
+
+  <br/>
+
+  <h2>⬇ Download Results</h2>
+  <button onclick="window.open('https://openspecimen-quiz.onrender.com/export/summary', '_blank')">
+    Download Summary CSV
+  </button>
+
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
